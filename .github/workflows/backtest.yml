@@ -1,0 +1,43 @@
+name: forex-backtest
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "How many days back to test"
+        default: "7"
+      mode:
+        description: "all, ema, poc, or one of 1h / 4h / poc1h / poc4h"
+        default: "all"
+      email_results:
+        description: "Email the results? (yes/no)"
+        default: "no"
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run backtest
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: |
+          EXTRA=""
+          if [ "${{ github.event.inputs.email_results }}" = "yes" ]; then EXTRA="--email"; fi
+          python backtest.py --days ${{ github.event.inputs.days }} --mode ${{ github.event.inputs.mode }} $EXTRA
+      - name: Show results on the run page
+        run: |
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat results.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backtest-results
+          path: |
+            results.txt
+            trades.csv
